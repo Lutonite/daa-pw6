@@ -15,5 +15,15 @@ data class Contact(
     var zip: String?,
     var city: String?,
     var type: PhoneType?,
-    var phoneNumber: String?
-)
+    var phoneNumber: String?,
+    // Synchronization properties
+//    var serverId: Long? = null,
+//    @Transient var state: State = State.SYNCED,
+) {
+    enum class State {
+        SYNCED,  // The contact is in sync with the server
+        CREATED, // The contact has been created locally
+        UPDATED, // The contact has been updated locally
+        DELETED, // The contact has been deleted locally
+    }
+}
