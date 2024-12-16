@@ -1,14 +1,13 @@
 #import "template.typ": *
 #show: project.with(
-  title: "DAA - Laboratoire X",
+  title: "DAA - Laboratoire 4",
   authors: (
-    "<authors here>"
+    "Émilie Bressoud",
+    "Sacha Butty",
+    "Loïc Herman"
   ),
-  date: "<date here>",
-) 
-
-= Réponses aux questions
-
+  date: "November 25, 2024",
+)
 
 = Détails d'implémentation
 
