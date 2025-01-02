@@ -16,6 +16,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -31,8 +34,9 @@ import ch.heigvd.iict.daa.rest.viewmodels.ContactsViewModelFactory
 @Composable
 fun AppContact(application: ContactsApplication, contactsViewModel : ContactsViewModel = viewModel(factory= ContactsViewModelFactory(application))) {
     val context = LocalContext.current
-    val contacts : List<Contact> by contactsViewModel.allContacts.observeAsState(initial = emptyList())
-
+    val contacts: List<Contact> by contactsViewModel.allContacts.observeAsState(initial = emptyList())
+    var editionMode by remember { mutableStateOf(false) }
+    var selectedContact by remember { mutableStateOf<Contact?>(null) }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -58,8 +62,16 @@ fun AppContact(application: ContactsApplication, contactsViewModel : ContactsVie
     )
     { padding ->
         Column(modifier = Modifier.padding(top = padding.calculateTopPadding())) {
-            ScreenContactList(contacts) { selectedContact ->
-                Toast.makeText(context, "TODO - Edition de ${selectedContact.firstname} ${selectedContact.name}", Toast.LENGTH_SHORT).show()
+            if (editionMode) {
+                ScreenContactsEditor(
+                    contactsViewModel = contactsViewModel,
+                    contact = selectedContact
+                )
+            } else {
+                ScreenContactList(contacts) { contact ->
+                    selectedContact = contact
+                    editionMode = true
+                }
             }
         }
     }
