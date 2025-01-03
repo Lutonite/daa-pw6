@@ -1,5 +1,6 @@
 package ch.heigvd.iict.daa.rest.viewmodels
 
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -15,7 +16,21 @@ class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(app
 
     fun enroll() {
         viewModelScope.launch {
-            //TODO
+            try {
+                // Clear existing contacts
+                repository.clearAllContacts()
+                
+                // Get new UUID from server
+                val uuid = repository.enroll()
+                
+                // Save UUID in preferences
+                getApplication<ContactsApplication>().saveUUID(uuid)
+                
+                // Fetch initial contacts
+                //repository.fetchContacts(uuid)
+            } catch (e: Exception) {
+                Log.e("ContactsViewModel", "Failed to enroll", e)
+            }
         }
     }
 

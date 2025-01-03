@@ -73,6 +73,9 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     implementation(libs.androidx.runtime.livedata)
+    implementation(libs.firebase.crashlytics.buildtools)
+    implementation(libs.volley.v121)
+    implementation(libs.play.services.basement)
     ksp(libs.room.compiler)
     androidTestImplementation(libs.room.testing)
 
