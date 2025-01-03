@@ -90,6 +90,7 @@ dependencies {
 
     // ViewModels + coroutines
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.gson.v2101)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

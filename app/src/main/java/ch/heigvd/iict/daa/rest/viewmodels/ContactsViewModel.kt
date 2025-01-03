@@ -22,12 +22,13 @@ class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(app
                 
                 // Get new UUID from server
                 val uuid = repository.enroll()
+                Log.i("ContactsViewModel", "Enrolled with UUID: $uuid")
                 
                 // Save UUID in preferences
                 getApplication<ContactsApplication>().saveUUID(uuid)
                 
                 // Fetch initial contacts
-                //repository.fetchContacts(uuid)
+                repository.fetchContacts(uuid)
             } catch (e: Exception) {
                 Log.e("ContactsViewModel", "Failed to enroll", e)
             }
