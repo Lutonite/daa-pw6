@@ -59,6 +59,7 @@ fun ScreenContactsEditor(
     var contactFirstname by remember { mutableStateOf(contact?.firstname) }
     var contactAddress by remember { mutableStateOf(contact?.address) }
     var contactBirthday by remember { mutableStateOf(contact?.birthday) }
+    var contactEmail by remember { mutableStateOf(contact?.email) }
     var contactZip by remember { mutableStateOf(contact?.zip) }
     var contactCity by remember { mutableStateOf(contact?.city) }
     var contactType by remember { mutableStateOf(contact?.type) }
@@ -83,6 +84,11 @@ fun ScreenContactsEditor(
             stringResource(R.string.screen_detail_firstname_subtitle),
             contactFirstname,
             onValueChange = { contactFirstname = it }
+        )
+        ContactTextField(
+            stringResource(R.string.screen_detail_email_subtitle),
+            contactEmail,
+            onValueChange = { contactEmail = it }
         )
         ContactDateField(
             stringResource(R.string.screen_detail_birthday_subtitle),
@@ -126,7 +132,8 @@ fun ScreenContactsEditor(
                 phoneNumber = contactPhone,
                 type = contactType,
                 birthday = contactBirthday,
-                email = contact?.email
+                email = contactEmail,
+                serverId = contact?.serverId,
             ), onNavigateBack
         )
     }
@@ -238,7 +245,7 @@ private fun ContactPhoneTypeField(
 private fun EditButtons(
     viewModel: ContactsViewModel,
     isNew: Boolean,
-    editedContact: Contact?,
+    editedContact: Contact,
     onNavigateBack: () -> Unit
 ) {
     Row(

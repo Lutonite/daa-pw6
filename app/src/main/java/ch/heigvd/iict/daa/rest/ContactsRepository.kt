@@ -80,10 +80,13 @@ class ContactsRepository(
                 },
                 { error ->
                     continuation.resumeWithException(error)
-                    Log.e("ContactsRepository", "Failed to get response", error)
+                    Log.e("ContactsRepository", "Failed to get response ${error.message}", error)
                 }
             ) {
-                override fun getHeaders() = hashMapOf(HEADER_UUID to uuid)
+                override fun getHeaders() = HashMap<String, String>().apply {
+                    put(HEADER_UUID, uuid)
+                    put("Content-Type", "application/json")
+                }
             }
 
             queue.add(request)
@@ -122,9 +125,11 @@ class ContactsRepository(
             Log.i("ContactsRepository", "Create body: $body")
             val response = makeRequest(Request.Method.POST, "/contacts", body, uuid)
             val serverContact = Gson().fromJson(response.toString(), ContactDTO::class.java)
+            Log.i("ContactsRepository", "Server response: $serverContact")
             // Update with SYNCED state and server ID if successful
             contactsDao.update(
                 localContact.copy(
+                    id = localId,
                     serverId = serverContact.id,
                     state = Contact.State.SYNCED
                 )
@@ -138,6 +143,7 @@ class ContactsRepository(
     suspend fun update(contact: Contact, uuid: String) = withContext(Dispatchers.IO) {
         // Save with UPDATED state first
         val localContact = contact.copy(state = Contact.State.UPDATED)
+        Log.i("ContactsRepository", "Updating local contact: $localContact")
         contactsDao.update(localContact)
 
         try {
@@ -145,15 +151,20 @@ class ContactsRepository(
             val body = JSONObject(Gson().toJson(contact.toDTO()))
             Log.i("ContactsRepository", "Updating contact: $body")
             contactsDao.update(localContact.copy(state = Contact.State.UPDATED))
-            val response = makeRequest(
-                Request.Method.PUT,
-                "/contacts/${contact.serverId}",
-                body,
-                uuid
-            )
+            // Contact has been synced before
+            if (contact.serverId != null) {
+                val response = makeRequest(
+                    Request.Method.PUT,
+                    "/contacts/${contact.serverId}",
+                    body,
+                    uuid
+                )
 
-            // Update to SYNCED if successful
-            contactsDao.update(localContact.copy(state = Contact.State.SYNCED))
+                // Update to SYNCED if successful
+                contactsDao.update(localContact.copy(state = Contact.State.SYNCED))
+            } else {
+
+            }
         } catch (e: Exception) {
             Log.e("ContactsRepository", "Failed to sync with server", e)
             // Keep UPDATED state
