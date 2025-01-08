@@ -7,13 +7,9 @@ import java.util.Date
 class CalendarConverter {
 
     @TypeConverter
-    fun toCalendar(dateLong: Long) =
-        Calendar.getInstance().apply {
-            time = Date(dateLong)
-        }
+    fun toCalendar(dateLong: Long) = Calendar.getInstance().apply { time = Date(dateLong) }
 
     @TypeConverter
-    fun fromCalendar(date: Calendar) =
-        date.time.time
+    fun fromCalendar(date: Calendar) = date.time.time
 
 }

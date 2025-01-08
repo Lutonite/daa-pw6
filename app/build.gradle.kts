@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.test
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -11,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "ch.heigvd.iict.daa.labo6"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -54,7 +56,6 @@ android {
 }
 
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -73,9 +74,6 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     implementation(libs.androidx.runtime.livedata)
-    implementation(libs.firebase.crashlytics.buildtools)
-    implementation(libs.volley.v121)
-    implementation(libs.play.services.basement)
     ksp(libs.room.compiler)
     androidTestImplementation(libs.room.testing)
 
@@ -90,7 +88,10 @@ dependencies {
 
     // ViewModels + coroutines
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.gson.v2101)
+
+    // API client
+    implementation(libs.square.retrofit)
+    implementation(libs.square.retrofit.gson)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -100,5 +101,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
 }
