@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import ch.heigvd.iict.daa.rest.ContactsApplication
+import ch.heigvd.iict.daa.rest.models.Contact
 import kotlinx.coroutines.launch
 
 class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(application) {
@@ -41,6 +42,45 @@ class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(app
         }
     }
 
+    fun create(contact: Contact) {
+        viewModelScope.launch {
+            try {
+                repository.create(
+                    contact,
+                    getApplication<ContactsApplication>().getUUID()
+                        ?: throw IllegalStateException("UUID not found")
+                )
+            } catch (e: Exception) {
+                Log.e("ContactsViewModel", "Failed to create contact", e)
+            }
+        }
+    }
+
+    fun update(contact: Contact) {
+        viewModelScope.launch {
+            try {
+                val uuid = getApplication<ContactsApplication>().getUUID()
+                    ?: throw IllegalStateException("UUID not found")
+                // Update locally first with UPDATED state
+                repository.update(contact, uuid)
+            } catch (e: Exception) {
+                Log.e("ContactsViewModel", "Failed to update contact", e)
+            }
+        }
+    }
+
+    fun delete(contact: Contact) {
+        viewModelScope.launch {
+            try {
+                val uuid = getApplication<ContactsApplication>().getUUID()
+                    ?: throw IllegalStateException("UUID not found")
+                // Update locally first with DELETED state
+                //repository.delete(contact, uuid)
+            } catch (e: Exception) {
+                Log.e("ContactsViewModel", "Failed to delete contact", e)
+            }
+        }
+    }
 }
 
 class ContactsViewModelFactory(private val application: ContactsApplication) : ViewModelProvider.Factory {

@@ -1,6 +1,5 @@
 package ch.heigvd.iict.daa.rest.ui.screens
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -37,6 +36,7 @@ fun AppContact(application: ContactsApplication, contactsViewModel : ContactsVie
     val contacts: List<Contact> by contactsViewModel.allContacts.observeAsState(initial = emptyList())
     var editionMode by remember { mutableStateOf(false) }
     var selectedContact by remember { mutableStateOf<Contact?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -54,7 +54,8 @@ fun AppContact(application: ContactsApplication, contactsViewModel : ContactsVie
         floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                Toast.makeText(context, "TODO - Création d'un nouveau contact", Toast.LENGTH_SHORT).show()
+                selectedContact = null
+                editionMode = true
             }){
                 Icon(Icons.Default.Add, contentDescription = null)
             }
@@ -65,7 +66,10 @@ fun AppContact(application: ContactsApplication, contactsViewModel : ContactsVie
             if (editionMode) {
                 ScreenContactsEditor(
                     contactsViewModel = contactsViewModel,
-                    contact = selectedContact
+                    contact = selectedContact,
+                    onNavigateBack = {
+                        editionMode = false
+                    }
                 )
             } else {
                 ScreenContactList(contacts) { contact ->

@@ -26,17 +26,8 @@ data class Contact(
         UPDATED, // The contact has been updated locally
         DELETED, // The contact has been deleted locally
     }
-    constructor(
-        name: String,
-        firstname: String?,
-        birthday: Calendar?,
-        email: String?,
-        address: String?,
-        zip: String?,
-        city: String?,
-        type: PhoneType?,
-        phoneNumber: String?,
-        serverId: Long?
-    ) : this(null, name, firstname, birthday, email, address, zip, city, type, phoneNumber,null)
+
+    constructor() : this(null, "", "", null, "", "", "", "", null, "")
+
 
 }

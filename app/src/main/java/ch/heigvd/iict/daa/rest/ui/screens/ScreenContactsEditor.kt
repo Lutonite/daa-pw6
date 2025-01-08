@@ -1,5 +1,7 @@
 package ch.heigvd.iict.daa.rest.ui.screens
 
+import android.app.DatePickerDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +14,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -23,20 +24,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import ch.heigvd.iict.daa.rest.ContactsApplication
 import ch.heigvd.iict.daa.rest.R
 import ch.heigvd.iict.daa.rest.models.Contact
 import ch.heigvd.iict.daa.rest.models.PhoneType
 import ch.heigvd.iict.daa.rest.ui.theme.MyComposeApplicationTheme
 import ch.heigvd.iict.daa.rest.viewmodels.ContactsViewModel
-import java.text.DateFormat
+import ch.heigvd.iict.daa.rest.viewmodels.ContactsViewModelFactory
+import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
+import java.util.Locale
 
 /**
  * Main composable for editing contacts.
@@ -50,8 +51,9 @@ import java.util.Date
  */
 @Composable
 fun ScreenContactsEditor(
-    contactsViewModel: ContactsViewModel?,
+    contactsViewModel: ContactsViewModel,
     contact: Contact?,
+    onNavigateBack: () -> Unit
 ) {
     var contactName by remember { mutableStateOf(contact?.name) }
     var contactFirstname by remember { mutableStateOf(contact?.firstname) }
@@ -113,7 +115,20 @@ fun ScreenContactsEditor(
             contactPhone?: "",
             onValueChange = { contactPhone = it }
         )
-        EditButtons()
+        EditButtons(
+            contactsViewModel, contact == null,
+            Contact(
+                name = contactName ?: "",
+                firstname = contactFirstname,
+                address = contactAddress,
+                zip = contactZip,
+                city = contactCity,
+                phoneNumber = contactPhone,
+                type = contactType,
+                birthday = contactBirthday,
+                email = contact?.email
+            ), onNavigateBack
+        )
     }
 
 }
@@ -131,45 +146,57 @@ private fun ContactTextField(
     ) {
         Text(
             text = label,
-
-
         )
         TextField(
             value = fieldValue ?: "",
             onValueChange = onValueChange,
-
         )
     }
 }
 
 @Composable
-private fun ContactDateField(
+fun ContactDateField(
     label: String,
-    fieldValue: Calendar?,
-    onValueChange: (Calendar) -> Unit,
+    value: Calendar?,
+    onValueChange: (Calendar) -> Unit
 ) {
-    fun formatDate(calendar: Calendar) = DateFormat
-        .getDateInstance(DateFormat.SHORT)
-        .format(calendar.time)
+    var showDialog by remember { mutableStateOf(false) }
+    val dateFormatter = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
 
-    fun parseDate(date: String) = Calendar.getInstance().apply {
-        time = DateFormat.getDateInstance(DateFormat.SHORT).parse(date) ?: Date()
+    if (showDialog) {
+        val datePickerDialog = DatePickerDialog(
+            LocalContext.current,
+            { _, year, month, dayOfMonth ->
+                Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth)
+                    onValueChange(this)
+                }
+                showDialog = false
+            },
+            value?.get(Calendar.YEAR) ?: Calendar.getInstance().get(Calendar.YEAR),
+            value?.get(Calendar.MONTH) ?: Calendar.getInstance().get(Calendar.MONTH),
+            value?.get(Calendar.DAY_OF_MONTH) ?: Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+        )
+        datePickerDialog.show()
     }
 
-    var textValue by remember { mutableStateOf(fieldValue?.let { formatDate(it) } ?: "") }
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
         Text(text = label)
         TextField(
-            value = textValue,
-            onValueChange = {
-                textValue = it
-                onValueChange(parseDate(it))
-            }
-        )
+            value = value?.let { dateFormatter.format(it.time) } ?: "",
+            onValueChange = { },
+            readOnly = true,
+            enabled = false, // workaround to make the field clickable
+            modifier = Modifier
+                .clickable {
+                    showDialog = true
+                },
+
+            )
     }
 }
 
@@ -208,41 +235,58 @@ private fun ContactPhoneTypeField(
 }
 
 @Composable
-private fun EditButtons() {
+private fun EditButtons(
+    viewModel: ContactsViewModel,
+    isNew: Boolean,
+    editedContact: Contact?,
+    onNavigateBack: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly)
-    {
-        Button(
-            onClick = {  }) {
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Button(onClick = onNavigateBack) {
             Text(text = "CANCEL")
         }
-        Button(
-            onClick = { /*TODO*/ },
-        ) {
-            Icon(
-                imageVector = Icons.Default.Delete,
-                contentDescription = null,
-                modifier = Modifier.padding(end =
-                dimensionResource(
-                R.dimen.list_item_elements_padding)
-                )
-            )
-            Text(text = "DELETE")
-        }
 
-        Button(
-            onClick = { /*TODO*/ },
-        ) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null,
-                modifier = Modifier.padding(end =
-                dimensionResource(
-                    R.dimen.list_item_elements_padding)
+        if (!isNew) {
+            Button(onClick = {
+                viewModel.delete(editedContact!!)
+                onNavigateBack()
+            }) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = dimensionResource(R.dimen.list_item_elements_padding))
                 )
-            )
-            Text(text = "SAVE")
+                Text(text = "DELETE")
+            }
+
+            Button(onClick = {
+                viewModel.update(editedContact!!)
+                onNavigateBack()
+            }) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = dimensionResource(R.dimen.list_item_elements_padding))
+                )
+                Text(text = "SAVE")
+            }
+        } else {
+            Button(onClick = {
+                viewModel.create(
+                    editedContact!!
+                )
+                onNavigateBack()
+            }) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = dimensionResource(R.dimen.list_item_elements_padding))
+                )
+                Text(text = "CREATE")
+            }
         }
     }
 }
@@ -266,7 +310,9 @@ val demo = Contact(
 @Composable
 fun ContactEditorPreview() {
     MyComposeApplicationTheme {
-        ScreenContactsEditor(null, demo)
+        val viewModel =
+            ContactsViewModelFactory(ContactsApplication()).create(ContactsViewModel::class.java)
+        ScreenContactsEditor(viewModel, demo) {}
     }
 }
 
