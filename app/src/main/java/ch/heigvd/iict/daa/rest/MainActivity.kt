@@ -12,7 +12,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MyComposeApplicationTheme {
-                AppContact(application = application as ContactsApplication)
+                AppContact()
             }
         }
     }

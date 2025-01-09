@@ -1,95 +1,96 @@
 package ch.heigvd.iict.daa.rest.viewmodels
 
-import android.util.Log
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import ch.heigvd.iict.daa.rest.ContactsApplication
 import ch.heigvd.iict.daa.rest.models.Contact
 import kotlinx.coroutines.launch
+import java.util.UUID
+
+private const val CONTACTS_PREFS_CONTEXT_KEY = "contacts_prefs"
+private const val CONTACTS_PREFS_KEY_TOKEN = "enrollment_token"
 
 class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(application) {
 
     private val repository = application.repository
+    private val sharedPreferences = application.getSharedPreferences(
+        CONTACTS_PREFS_CONTEXT_KEY,
+        Context.MODE_PRIVATE
+    )
+
+    private var userEnrollmentToken: UUID?
+        get() = sharedPreferences
+            .getString(CONTACTS_PREFS_KEY_TOKEN, null)
+            ?.let { UUID.fromString(it) }
+        set(value) = with(sharedPreferences.edit()) {
+            putString(CONTACTS_PREFS_KEY_TOKEN, value?.toString())
+            apply()
+        }
 
     val allContacts = repository.allContacts
 
-    fun enroll() {
-        viewModelScope.launch {
-            try {
-                // Clear existing contacts
-                repository.clearAllContacts()
-                
-                // Get new UUID from server
-                val uuid = repository.enroll()
-                Log.i("ContactsViewModel", "Enrolled with UUID: $uuid")
-                
-                // Save UUID in preferences
-                getApplication<ContactsApplication>().saveUUID(uuid)
-                
-                // Fetch initial contacts
-                repository.fetchContacts(uuid)
-            } catch (e: Exception) {
-                Log.e("ContactsViewModel", "Failed to enroll", e)
-            }
-        }
+    private var _editionMode: MutableLiveData<Boolean> = MutableLiveData(false)
+    private var _selectedContact: MutableLiveData<Contact?> = MutableLiveData(null)
+    val editionMode: LiveData<Boolean> get() = _editionMode
+    val selectedContact: LiveData<Contact?> get() = _selectedContact
+
+    fun startEdition(contact: Contact? = null) {
+        _editionMode.value = true
+        _selectedContact.value = contact
     }
 
-    fun refresh() {
-        viewModelScope.launch {
-            try {
-                val uuid = getApplication<ContactsApplication>().getUUID()
-                repository.refresh(uuid)
-            } catch (e: Exception) {
-                Log.e("ContactsViewModel", "Failed to refresh contacts", e)
-            }
-        }
+    fun stopEdition() {
+        _editionMode.value = false
+        _selectedContact.value = null
     }
 
-    fun create(contact: Contact) {
-        viewModelScope.launch {
-            try {
-                repository.create(
-                    contact,
-                    getApplication<ContactsApplication>().getUUID()
-                )
-            } catch (e: Exception) {
-                Log.e("ContactsViewModel", "Failed to create contact", e)
-            }
+    fun enroll() = viewModelScope.launch {
+        // Clear existing contacts
+        repository.deleteContacts()
+
+        // Get new UUID from server
+        userEnrollmentToken = repository.enroll()
+        if (userEnrollmentToken == null) {
+            return@launch
         }
+
+        // Fetch contacts from server
+        repository.fetchContacts(userEnrollmentToken!!)
     }
 
-    fun update(contact: Contact) {
-        viewModelScope.launch {
-            try {
-                val uuid = getApplication<ContactsApplication>().getUUID()
-                // Update locally first with UPDATED state
-                repository.update(contact, uuid)
-            } catch (e: Exception) {
-                Log.e("ContactsViewModel", "Failed to update contact", e)
-            }
-        }
+    fun refresh() = viewModelScope.launch {
+        repository.refreshContacts(userEnrollmentToken)
     }
 
-    fun delete(contact: Contact) {
-        viewModelScope.launch {
-            try {
-                val uuid = getApplication<ContactsApplication>().getUUID()
-                repository.delete(contact, uuid)
-            } catch (e: Exception) {
-                Log.e("ContactsViewModel", "Failed to delete contact", e)
-            }
-        }
+    fun create(contact: Contact) = viewModelScope.launch {
+        repository.saveContact(contact, userEnrollmentToken)
     }
-}
 
-class ContactsViewModelFactory(private val application: ContactsApplication) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(ContactsViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return ContactsViewModel(application) as T
+    fun update(contact: Contact) = viewModelScope.launch {
+        repository.saveContact(contact, userEnrollmentToken)
+    }
+
+    fun delete(contact: Contact) = viewModelScope.launch {
+        repository.deleteContact(contact, userEnrollmentToken)
+    }
+
+    companion object {
+
+        /**
+         * Factory for the [ContactsViewModel].
+         *
+         * @author Emilie Bressoud
+         * @author Loïc Herman
+         * @author Sacha Butty
+         */
+        val Factory = viewModelFactory {
+            initializer { ContactsViewModel(requireNotNull(this[APPLICATION_KEY]) as ContactsApplication) }
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

@@ -1,7 +1,5 @@
 [versions]
 agp = "8.7.2"
-gson = "x.y.z"
-gsonVersion = "2.10.1"
 kotlin = "2.0.21"
 ksp = "2.0.21-1.0.25"
 coreKtx = "1.13.1"
@@ -17,15 +15,10 @@ room = "2.6.1"
 lifecycle = "2.8.7"
 composeBom = "2024.11.00"
 runtimeLivedata = "1.7.5"
-firebaseCrashlyticsBuildtools = "3.0.2"
-volley = "x.y.z"
-volleyVersion = "1.2.1"
-playServicesBasement = "18.5.0"
+retrofit = "2.11.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
-gson-v2101 = { module = "com.google.code.gson:gson", version.ref = "gsonVersion" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -54,10 +47,9 @@ androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-man
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
-firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebaseCrashlyticsBuildtools" }
-volley = { module = "com.android.volley:volley", version.ref = "volley" }
-volley-v121 = { module = "com.android.volley:volley", version.ref = "volleyVersion" }
-play-services-basement = { group = "com.google.android.gms", name = "play-services-basement", version.ref = "playServicesBasement" }
+
+square-retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+square-retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

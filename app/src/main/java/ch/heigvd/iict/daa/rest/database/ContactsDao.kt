@@ -20,22 +20,35 @@ interface ContactsDao {
     @Delete
     fun delete(contact: Contact)
 
-    fun softDelete(contact: Contact) {
-        contact.state = Contact.State.DELETED
-        update(contact)
-    }
+    @Query("SELECT * FROM Contact WHERE state IN (:states)")
+    fun getContacts(
+        vararg states: Contact.State = arrayOf(
+            Contact.State.SYNCED,
+            Contact.State.CREATED,
+            Contact.State.UPDATED
+        )
+    ): List<Contact>
 
-    @Query("SELECT * FROM Contact WHERE state != :state")
-    fun getAllContactsLiveData(state: Contact.State = Contact.State.DELETED): LiveData<List<Contact>>
-
-    @Query("SELECT * FROM Contact WHERE state != :state")
-    fun getAllUnsyncedContacts(state: Contact.State = Contact.State.SYNCED): List<Contact>
+    @Query("SELECT * FROM Contact WHERE state IN (:states)")
+    fun getContactsLiveData(
+        vararg states: Contact.State = arrayOf(
+            Contact.State.SYNCED,
+            Contact.State.CREATED,
+            Contact.State.UPDATED
+        )
+    ): LiveData<List<Contact>>
 
     @Query("SELECT * FROM Contact WHERE id = :id")
-    fun getContactById(id : Long) : Contact?
+    fun getContactById(id: Long): Contact?
 
-    @Query("SELECT COUNT(*) FROM Contact")
-    fun getCount() : Int
+    @Query("SELECT COUNT(*) FROM Contact WHERE state IN (:states)")
+    fun getCount(
+        vararg states: Contact.State = arrayOf(
+            Contact.State.SYNCED,
+            Contact.State.CREATED,
+            Contact.State.UPDATED
+        )
+    ): Int
 
     @Query("DELETE FROM Contact")
     fun clearAllContacts()

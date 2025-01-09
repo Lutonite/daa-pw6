@@ -1,5 +1,6 @@
 package ch.heigvd.iict.daa.rest.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -15,27 +16,27 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
-import ch.heigvd.iict.daa.rest.ContactsApplication
 import ch.heigvd.iict.daa.rest.R
 import ch.heigvd.iict.daa.rest.models.Contact
 import ch.heigvd.iict.daa.rest.viewmodels.ContactsViewModel
-import ch.heigvd.iict.daa.rest.viewmodels.ContactsViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppContact(application: ContactsApplication, contactsViewModel : ContactsViewModel = viewModel(factory= ContactsViewModelFactory(application))) {
-    val context = LocalContext.current
+fun AppContact(
+    contactsViewModel: ContactsViewModel = viewModel(factory = ContactsViewModel.Factory)
+) {
     val contacts: List<Contact> by contactsViewModel.allContacts.observeAsState(initial = emptyList())
-    var editionMode by remember { mutableStateOf(false) }
-    var selectedContact by remember { mutableStateOf<Contact?>(null) }
+    val editionMode by contactsViewModel.editionMode.observeAsState(initial = false)
+    val selectedContact by contactsViewModel.selectedContact.observeAsState()
+
+    BackHandler(
+        enabled = editionMode,
+        onBack = { contactsViewModel.stopEdition() }
+    )
 
     Scaffold(
         topBar = {
@@ -44,19 +45,26 @@ fun AppContact(application: ContactsApplication, contactsViewModel : ContactsVie
                 actions = {
                     IconButton(onClick = {
                         contactsViewModel.enroll()
-                    }) { Icon(painter = painterResource(R.drawable.populate), contentDescription = null) }
+                    }) {
+                        Icon(
+                            painter = painterResource(R.drawable.populate),
+                            contentDescription = null
+                        )
+                    }
                     IconButton(onClick = {
                         contactsViewModel.refresh()
-                    }) { Icon(painter = painterResource(R.drawable.synchronize), contentDescription = null) }
+                    }) {
+                        Icon(
+                            painter = painterResource(R.drawable.synchronize),
+                            contentDescription = null
+                        )
+                    }
                 }
             )
         },
         floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
-            FloatingActionButton(onClick = {
-                selectedContact = null
-                editionMode = true
-            }){
+            FloatingActionButton(onClick = { contactsViewModel.startEdition() }) {
                 Icon(Icons.Default.Add, contentDescription = null)
             }
         },
@@ -67,15 +75,10 @@ fun AppContact(application: ContactsApplication, contactsViewModel : ContactsVie
                 ScreenContactsEditor(
                     contactsViewModel = contactsViewModel,
                     contact = selectedContact,
-                    onNavigateBack = {
-                        editionMode = false
-                    }
+                    onQuit = { contactsViewModel.stopEdition() }
                 )
             } else {
-                ScreenContactList(contacts) { contact ->
-                    selectedContact = contact
-                    editionMode = true
-                }
+                ScreenContactList(contacts) { contact -> contactsViewModel.startEdition(contact) }
             }
         }
     }

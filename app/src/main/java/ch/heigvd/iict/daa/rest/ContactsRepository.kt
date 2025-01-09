@@ -3,289 +3,148 @@ package ch.heigvd.iict.daa.rest
 import android.util.Log
 import ch.heigvd.iict.daa.rest.database.ContactsDao
 import ch.heigvd.iict.daa.rest.models.Contact
-import ch.heigvd.iict.daa.rest.models.ContactDTO
-import ch.heigvd.iict.daa.rest.models.PhoneType
-import com.android.volley.Request
-import com.android.volley.RequestQueue
-import com.android.volley.toolbox.JsonObjectRequest
-import com.android.volley.toolbox.StringRequest
-import com.google.gson.Gson
+import ch.heigvd.iict.daa.rest.models.toContact
+import ch.heigvd.iict.daa.rest.models.toDTO
+import ch.heigvd.iict.daa.rest.rest.ContactApiService
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
+import java.util.UUID
 
+/**
+ * Repository handling data operations for contacts on the local database and remote server
+ *
+ * @author Emilie Bressoud
+ * @author Loïc Herman
+ * @author Sacha Butty
+ */
 class ContactsRepository(
     private val contactsDao: ContactsDao,
-    private val queue: RequestQueue
+    private val contactService: ContactApiService,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
-    val allContacts = contactsDao.getAllContactsLiveData()
+    val allContacts = contactsDao.getContactsLiveData()
 
-    companion object {
-        private const val BASE_URL = "https://daa.iict.ch"
-        private const val HEADER_UUID = "X-UUID"
+    suspend fun enroll(): UUID? = try {
+        contactService.enroll()
+    } catch (e: Exception) {
+        Log.e(TAG, "Failed to enroll with server", e)
+        null
     }
 
-    private suspend fun <T> getRequest(
-        method: Int,
-        endpoint: String,
-        uuid: String? = null,
-        parser: (String) -> T
-    ) = withContext(Dispatchers.IO) {
-        suspendCoroutine { continuation ->
-            val request = object : StringRequest(
-                method,
-                "$BASE_URL$endpoint",
-                { response ->
-                    try {
-                        Log.d("ContactsRepository", "Received response: $response")
-                        continuation.resume(parser(response))
-                    } catch (e: Exception) {
-                        Log.e("ContactsRepository", "Failed to parse response", e)
-                        continuation.resumeWithException(e)
-                    }
-                },
-                { error ->
-                    continuation.resumeWithException(error)
-                    Log.e("ContactsRepository", "Failed to parse response", error)
-
-                }
-            ) {
-                override fun getHeaders() = uuid?.let {
-                    hashMapOf(HEADER_UUID to it)
-                } ?: hashMapOf()
-            }
-            queue.add(request)
+    suspend fun fetchContacts(uuid: UUID) = withContext(dispatcher) {
+        try {
+            val contacts = contactService.getContacts(uuid)
+            contacts.forEach { dto -> contactsDao.insert(dto.toContact()) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync fetch with server", e)
         }
     }
 
-    private suspend fun makeRequest(
-        method: Int,
-        endpoint: String,
-        body: JSONObject? = null,
-        uuid: String
-    ) = withContext(Dispatchers.IO) {
-        suspendCoroutine { continuation ->
-            val request = object : JsonObjectRequest(
-                method,
-                "$BASE_URL$endpoint",
-                body,
-                { response ->
-                    Log.d("ContactsRepository", "Received response: $response")
-                    continuation.resume(response)
-                },
-                { error ->
-                    continuation.resumeWithException(error)
-                    Log.e("ContactsRepository", "Failed to get response ${error.message}", error)
-                }
-            ) {
-                override fun getHeaders() = HashMap<String, String>().apply {
-                    put(HEADER_UUID, uuid)
-                    put("Content-Type", "application/json")
-                }
-            }
+    suspend fun getContact(localContactId: Long, uuid: UUID?): Contact? = withContext(dispatcher) {
+        val localContact = contactsDao.getContactById(localContactId)
+        // NOTE: we only fetch contacts which were already properly synced on the server,
+        //       so that local modifications are not discarded. A better conflict resolution could
+        //       later be implemented here.
+        if (localContact?.serverId == null || !localContact.synced) {
+            return@withContext localContact
+        }
 
-            queue.add(request)
+        if (uuid == null) {
+            return@withContext localContact
+        }
+
+        return@withContext try {
+            val serverContact = contactService
+                .getContact(uuid, localContact.serverId!!)
+                .toContact(localContact.id)
+
+            contactsDao.update(serverContact)
+            serverContact
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sync fetch with server", e)
+            localContact
         }
     }
 
-    private suspend fun deleteRequest(
-        method: Int,
-        endpoint: String,
-        uuid: String? = null,
-    ) = withContext(Dispatchers.IO) {
-        suspendCoroutine { continuation ->
-            val request = object : StringRequest(
-                method,
-                "$BASE_URL$endpoint",
-                {
-                    continuation.resume(Unit)
-                },
-                { error ->
-                    continuation.resumeWithException(error)
-                    Log.e(
-                        "ContactsRepository",
-                        "Failed to get response",
-                        error
-                    )
-
-                }
-            ) {
-                override fun getHeaders() = uuid?.let {
-                    hashMapOf(HEADER_UUID to it)
-                } ?: hashMapOf()
-            }
-            queue.add(request)
-        }
-    }
-
-
-    suspend fun enroll(): String = getRequest(
-        Request.Method.GET,
-        "/enroll"
-    ) { it }
-
-    suspend fun fetchContacts(uuid: String) = withContext(Dispatchers.IO) {
-        val contacts = getRequest(
-            Request.Method.GET,
-            "/contacts",
-            uuid
-        ) { json ->
-            Gson().fromJson(json, Array<ContactDTO>::class.java)
-        }
-
-        contacts.forEach { dto ->
-            contactsDao.insert(dto.toContact())
-        }
-        Log.d("ContactsRepository", "Fetched ${contacts.size} contacts")
-        contacts.toList()
-    }
-
-    suspend fun create(contact: Contact, uuid: String) = withContext(Dispatchers.IO) {
-        // Save with CREATED state first
-        val localContact = contact.copy(state = Contact.State.CREATED)
-        // Save locally if not already saved
+    suspend fun saveContact(contact: Contact, uuid: UUID?) = withContext(dispatcher) {
+        // Save locally as CREATED state, then attempt to sync
+        contact.state = Contact.State.CREATED
         if (contact.id == null) {
-            localContact.id = contactsDao.insert(localContact)
+            contact.id = contactsDao.insert(contact)
+        } else {
+            contact.state = Contact.State.UPDATED
+            contactsDao.update(contact)
         }
 
-        try {
-            // Try server sync
-            val body = JSONObject(Gson().toJson(contact.toDTO()))
-            Log.i("ContactsRepository", "Create body: $body")
-            val response = makeRequest(Request.Method.POST, "/contacts", body, uuid)
-            val serverContact = Gson().fromJson(response.toString(), ContactDTO::class.java)
-            Log.i("ContactsRepository", "Server response: $serverContact")
-            // Update with SYNCED state and server ID if successful
-            contactsDao.update(
-                localContact.copy(
-                    serverId = serverContact.id,
-                    state = Contact.State.SYNCED
-                )
-            )
-        } catch (e: Exception) {
-            Log.e("ContactsRepository", "Failed to sync with server", e)
-            // Keep state (NOT SYNCED)
+        if (uuid == null) {
+            return@withContext
         }
-    }
 
-    suspend fun update(contact: Contact, uuid: String) = withContext(Dispatchers.IO) {
-        // Save with UPDATED state first
-        val localContact = contact.copy(state = Contact.State.UPDATED)
-        Log.i("ContactsRepository", "Updating local contact: $localContact")
-        contactsDao.update(localContact)
-
+        // Attempt to sync with server
         try {
-            // Try server sync
-            val body = JSONObject(Gson().toJson(contact.toDTO()))
-            Log.i("ContactsRepository", "Updating contact: $body")
-            contactsDao.update(localContact.copy(state = Contact.State.UPDATED))
-            // Contact has been synced before
-            if (contact.serverId != null) {
-                val response = makeRequest(
-                    Request.Method.PUT,
-                    "/contacts/${contact.serverId}",
-                    body,
-                    uuid
-                )
-
-                // Update to SYNCED if successful
-                contactsDao.update(localContact.copy(state = Contact.State.SYNCED))
+            val response = if (contact.serverId != null) {
+                contactService.updateContact(uuid, contact.serverId!!, contact.toDTO())
             } else {
-
+                contactService.createContact(uuid, contact.toDTO())
             }
+
+            val serverContact = response.toContact(contact.id)
+            contactsDao.update(serverContact)
         } catch (e: Exception) {
-            Log.e("ContactsRepository", "Failed to sync with server", e)
-            // Keep UPDATED state
+            Log.e(TAG, "Failed to sync save with server", e)
+            // Will stay at current state until next sync
         }
     }
 
-    suspend fun delete(contact: Contact, uuid: String) = withContext(Dispatchers.IO) {
+    suspend fun deleteContact(contact: Contact, uuid: UUID?) = withContext(Dispatchers.IO) {
+        // If it is not synced with a server entity we can delete it straight away
+        if (contact.serverId == null) {
+            contactsDao.delete(contact)
+            return@withContext
+        }
+
         // Save with DELETED state first
-        contactsDao.softDelete(contact)
-        Log.i("ContactsRepository", "Deleting local contact: $contact")
+        contact.state = Contact.State.DELETED
+        contactsDao.update(contact)
 
+        if (uuid == null) {
+            return@withContext
+        }
+
+        // Attempt to sync with server
         try {
-            // Try server sync
-            if (contact.serverId != null) {
-                deleteRequest(
-                    Request.Method.DELETE,
-                    "/contacts/${contact.serverId}",
-                    uuid
-                )
-                // Delete locally if successful
-                contactsDao.delete(contact)
-                Log.i("ContactsRepository", "Deleted contact: $contact")
-            } else {
-
-            }
+            contactService.deleteContact(uuid, contact.serverId!!)
+            contactsDao.delete(contact)
         } catch (e: Exception) {
-            Log.e("ContactsRepository", "Failed to sync with server", e)
+            Log.e(TAG, "Failed to sync deletion with server", e)
             // Keep DELETED state
         }
     }
 
+    suspend fun refreshContacts(uuid: UUID?) = withContext(Dispatchers.IO) {
+        if (uuid == null) {
+            return@withContext
+        }
 
-    suspend fun clearAllContacts() = withContext(Dispatchers.IO) {
+        contactsDao.getContacts(
+            Contact.State.CREATED,
+            Contact.State.UPDATED,
+            Contact.State.DELETED
+        ).forEach { contact ->
+            when (contact.state) {
+                Contact.State.CREATED, Contact.State.UPDATED -> saveContact(contact, uuid)
+                Contact.State.DELETED -> deleteContact(contact, uuid)
+                else -> {}
+            }
+        }
+    }
+
+    suspend fun deleteContacts() = withContext(dispatcher) {
         contactsDao.clearAllContacts()
     }
 
-    suspend fun refresh(uuid: String) = withContext(Dispatchers.IO) {
-        contactsDao.getAllUnsyncedContacts().forEach { contact ->
-            when (contact.state) {
-                Contact.State.CREATED -> create(contact, uuid)
-                Contact.State.UPDATED -> update(contact, uuid)
-                Contact.State.DELETED -> delete(contact, uuid)
-                else -> {
-                }
-            }
-        }
-
-    }
-}
-
-fun ContactDTO.toContact() = Contact(
-    id = null,
-    serverId = id,
-    name = name,
-    firstname = firstname,
-    birthday = parseBirthday(birthday),
-    email = email,
-    address = address,
-    zip = zip,
-    city = city,
-    type = PhoneType.valueOf(type),
-    phoneNumber = phoneNumber
-)
-
-fun Contact.toDTO() = ContactDTO(
-    id = serverId,
-    name = name,
-    firstname = firstname ?: "",
-    birthday = birthday?.let {
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.getDefault())
-            .format(it.time)
-    } ?: "",
-    email = email ?: "",
-    address = address ?: "",
-    zip = zip ?: "",
-    city = city ?: "",
-    type = type?.name ?: "",
-    phoneNumber = phoneNumber ?: ""
-)
-
-private fun parseBirthday(dateStr: String): Calendar? {
-    return try {
-        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.getDefault())
-            .parse(dateStr)?.let { date ->
-                Calendar.getInstance().apply { time = date }
-            }
-    } catch (e: Exception) {
-        null
+    companion object {
+        private val TAG = ContactsRepository::class.simpleName
     }
 }
