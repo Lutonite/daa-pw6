@@ -38,7 +38,12 @@ class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(app
 
     fun refresh() {
         viewModelScope.launch {
-            //TODO
+            try {
+                val uuid = getApplication<ContactsApplication>().getUUID()
+                repository.refresh(uuid)
+            } catch (e: Exception) {
+                Log.e("ContactsViewModel", "Failed to refresh contacts", e)
+            }
         }
     }
 
@@ -48,7 +53,6 @@ class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(app
                 repository.create(
                     contact,
                     getApplication<ContactsApplication>().getUUID()
-                        ?: throw IllegalStateException("UUID not found")
                 )
             } catch (e: Exception) {
                 Log.e("ContactsViewModel", "Failed to create contact", e)
@@ -60,7 +64,6 @@ class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(app
         viewModelScope.launch {
             try {
                 val uuid = getApplication<ContactsApplication>().getUUID()
-                    ?: throw IllegalStateException("UUID not found")
                 // Update locally first with UPDATED state
                 repository.update(contact, uuid)
             } catch (e: Exception) {
@@ -73,9 +76,7 @@ class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(app
         viewModelScope.launch {
             try {
                 val uuid = getApplication<ContactsApplication>().getUUID()
-                    ?: throw IllegalStateException("UUID not found")
-                // Update locally first with DELETED state
-                //repository.delete(contact, uuid)
+                repository.delete(contact, uuid)
             } catch (e: Exception) {
                 Log.e("ContactsViewModel", "Failed to delete contact", e)
             }

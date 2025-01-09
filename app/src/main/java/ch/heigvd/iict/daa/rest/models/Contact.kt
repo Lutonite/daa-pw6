@@ -17,8 +17,8 @@ data class Contact(
     var type: PhoneType?,
     var phoneNumber: String?,
     // Synchronization properties
-   var serverId: Long? = null,
-   @Transient var state: State = State.SYNCED,
+    var serverId: Long? = null,
+    var state: State = State.CREATED,
 ) {
     enum class State {
         SYNCED,  // The contact is in sync with the server
@@ -27,7 +27,7 @@ data class Contact(
         DELETED, // The contact has been deleted locally
     }
 
-    constructor() : this(null, "", "", null, "", "", "", "", null, "")
+    constructor() : this(null, "", "", null, "", "", "", "", PhoneType.HOME, "")
 
 
 }

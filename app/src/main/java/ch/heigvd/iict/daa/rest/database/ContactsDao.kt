@@ -12,7 +12,7 @@ import ch.heigvd.iict.daa.rest.models.Contact
 interface ContactsDao {
 
     @Insert
-    fun insert(contact: Contact) : Long
+    fun insert(contact: Contact): Long
 
     @Update
     fun update(contact: Contact)
@@ -20,8 +20,16 @@ interface ContactsDao {
     @Delete
     fun delete(contact: Contact)
 
-    @Query("SELECT * FROM Contact")
-    fun getAllContactsLiveData() : LiveData<List<Contact>>
+    fun softDelete(contact: Contact) {
+        contact.state = Contact.State.DELETED
+        update(contact)
+    }
+
+    @Query("SELECT * FROM Contact WHERE state != :state")
+    fun getAllContactsLiveData(state: Contact.State = Contact.State.DELETED): LiveData<List<Contact>>
+
+    @Query("SELECT * FROM Contact WHERE state != :state")
+    fun getAllUnsyncedContacts(state: Contact.State = Contact.State.SYNCED): List<Contact>
 
     @Query("SELECT * FROM Contact WHERE id = :id")
     fun getContactById(id : Long) : Contact?

@@ -1,3 +1,5 @@
+package ch.heigvd.iict.daa.rest
+
 import android.util.Log
 import ch.heigvd.iict.daa.rest.database.ContactsDao
 import ch.heigvd.iict.daa.rest.models.Contact
@@ -62,11 +64,10 @@ class ContactsRepository(
         }
     }
 
-    // TODO make this work
     private suspend fun makeRequest(
         method: Int,
         endpoint: String,
-        body: JSONObject,
+        body: JSONObject? = null,
         uuid: String
     ) = withContext(Dispatchers.IO) {
         suspendCoroutine { continuation ->
@@ -93,6 +94,37 @@ class ContactsRepository(
         }
     }
 
+    private suspend fun deleteRequest(
+        method: Int,
+        endpoint: String,
+        uuid: String? = null,
+    ) = withContext(Dispatchers.IO) {
+        suspendCoroutine { continuation ->
+            val request = object : StringRequest(
+                method,
+                "$BASE_URL$endpoint",
+                {
+                    continuation.resume(Unit)
+                },
+                { error ->
+                    continuation.resumeWithException(error)
+                    Log.e(
+                        "ContactsRepository",
+                        "Failed to get response",
+                        error
+                    )
+
+                }
+            ) {
+                override fun getHeaders() = uuid?.let {
+                    hashMapOf(HEADER_UUID to it)
+                } ?: hashMapOf()
+            }
+            queue.add(request)
+        }
+    }
+
+
     suspend fun enroll(): String = getRequest(
         Request.Method.GET,
         "/enroll"
@@ -115,9 +147,12 @@ class ContactsRepository(
     }
 
     suspend fun create(contact: Contact, uuid: String) = withContext(Dispatchers.IO) {
-        // Save with PENDING state first
+        // Save with CREATED state first
         val localContact = contact.copy(state = Contact.State.CREATED)
-        val localId = contactsDao.insert(localContact)
+        // Save locally if not already saved
+        if (contact.id == null) {
+            localContact.id = contactsDao.insert(localContact)
+        }
 
         try {
             // Try server sync
@@ -129,7 +164,6 @@ class ContactsRepository(
             // Update with SYNCED state and server ID if successful
             contactsDao.update(
                 localContact.copy(
-                    id = localId,
                     serverId = serverContact.id,
                     state = Contact.State.SYNCED
                 )
@@ -171,9 +205,47 @@ class ContactsRepository(
         }
     }
 
+    suspend fun delete(contact: Contact, uuid: String) = withContext(Dispatchers.IO) {
+        // Save with DELETED state first
+        contactsDao.softDelete(contact)
+        Log.i("ContactsRepository", "Deleting local contact: $contact")
+
+        try {
+            // Try server sync
+            if (contact.serverId != null) {
+                deleteRequest(
+                    Request.Method.DELETE,
+                    "/contacts/${contact.serverId}",
+                    uuid
+                )
+                // Delete locally if successful
+                contactsDao.delete(contact)
+                Log.i("ContactsRepository", "Deleted contact: $contact")
+            } else {
+
+            }
+        } catch (e: Exception) {
+            Log.e("ContactsRepository", "Failed to sync with server", e)
+            // Keep DELETED state
+        }
+    }
+
 
     suspend fun clearAllContacts() = withContext(Dispatchers.IO) {
         contactsDao.clearAllContacts()
+    }
+
+    suspend fun refresh(uuid: String) = withContext(Dispatchers.IO) {
+        contactsDao.getAllUnsyncedContacts().forEach { contact ->
+            when (contact.state) {
+                Contact.State.CREATED -> create(contact, uuid)
+                Contact.State.UPDATED -> update(contact, uuid)
+                Contact.State.DELETED -> delete(contact, uuid)
+                else -> {
+                }
+            }
+        }
+
     }
 }
 

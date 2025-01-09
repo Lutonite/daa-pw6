@@ -1,6 +1,5 @@
 package ch.heigvd.iict.daa.rest
 
-import ContactsRepository
 import android.app.Application
 import android.content.Context
 import ch.heigvd.iict.daa.rest.database.ContactsDatabase
@@ -17,9 +16,9 @@ class ContactsApplication : Application() {
             .apply()
     }
 
-    fun getUUID(): String? {
+    fun getUUID(): String {
         return getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .getString(UUID_KEY, null)
+            .getString(UUID_KEY, null) ?: throw IllegalStateException("UUID not found")
     }
 
     private val database by lazy { ContactsDatabase.getDatabase(this) }
