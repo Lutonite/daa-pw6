@@ -12,7 +12,6 @@
 = Détails d'implémentation
 
 #import "template.typ": *
-// ... existing header ...
 
 = Détails d'implémentation
 
@@ -21,7 +20,7 @@ L'application utilise un système d'états pour gérer la synchronisation des co
 - *SYNCED* : Contact synchronisé avec le serveur
 - *CREATED* : Nouveau contact en attente de synchronisation
 - *UPDATED* : Contact modifié localement
-- *DELETED* : Contact marqué pour suppression
+- *DELETED* : Contact marqué pour la suppression avant la synchronisation
 
 
 == Opérations réseau
@@ -32,7 +31,7 @@ Lors de la création d'un contact, l'application privilégie l'expérience utili
 La modification suit une approche similaire à la création. Les changements sont immédiatement appliqués localement avec l'état UPDATED. L'application tente ensuite de synchroniser ces modifications avec le serveur. La réussite de cette opération entraîne le passage à l'état SYNCED, tandis qu'un échec maintient l'état UPDATED pour une synchronisation future.
 
 === Suppression d'un contact
-Pour la suppression, le contact est d'abord marqué comme DELETED dans la base de données locale. L'application tente ensuite de le supprimer sur le serveur. En cas de succès, le contact est définitivement supprimé de la base locale. Si la suppression côté serveur échoue, le contact reste marqué comme DELETED pour une tentative ultérieure.
+Pour la suppression, le contact est d'abord marqué comme DELETED dans la base de données locale. L'application tente ensuite de le supprimer sur le serveur. En cas de succès, le contact est définitivement supprimé de la base locale (hard delete). Si la suppression côté serveur échoue, le contact reste marqué comme DELETED pour une tentative ultérieure.
 
 Le marquage `DELETED`permet aussi d'identifier les contacts a ne plus afficher dans l'interface utilisateur.
 
@@ -40,7 +39,18 @@ Le marquage `DELETED`permet aussi d'identifier les contacts a ne plus afficher d
 La persistence des données est gérée via la bibliothèque Room. Nous utilisons une entité Contact qui comprend tous les champs nécessaires ainsi qu'un champ d'état pour la synchronisation. Room facilite la gestion des opérations CRUD et permet une observation réactive des changements via LiveData.
 
 == Stratégie de synchronisation
-Notre application implémente une approche "local-first" qui priorise la réactivité et l'expérience utilisateur. Les modifications sont appliquées immédiatement en local puis synchronisées avec le serveur de manière asynchrone. Les conflits sont gérés en conservant les états de synchronisation appropriés, permettant des tentatives ultérieures de synchronisation. Cette approche garantit que l'application reste utilisable même en cas de problèmes de connectivité.
+Notre application implémente l'approche "local-first" qui priorise la réactivité et l'expérience utilisateur. Les modifications sont appliquées immédiatement en local puis synchronisées avec le serveur de manière asynchrone en utilisant l'action refresh. Les conflits sont gérés en conservant les états de synchronisation appropriés, permettant des tentatives ultérieures de synchronisation. Cette approche garantit que l'application reste utilisable même en cas de problèmes de connectivité.
+
+=== Gestion des appels réseau
+Retrofit2 transforme automatiquement nos appels HTTP en méthodes Kotlin suspendues, permettant une utilisation naturelle avec les coroutines. Les annotations comme `@GET`, `@POST`, `@PUT` et `@DELETE` définissent le type de requête, tandis que `@Header` et `@Path` gèrent les paramètres dynamiques.
+
+=== Conversion des données
+La conversion entre JSON et objets Kotlin est gérée par le convertisseur Gson de Retrofit. Le DTOs assure une séparation claire entre les données réseau et le modèle local :
+- *ContactDTO* : Représentation réseau d'un contact
+- Mappers de conversion vers/depuis les entités locales
+
+=== Gestion des erreurs
+Les erreurs permettent de gérer les cas où la synchronisation échoue. Nous utilisons un simple try catch pour intercepter les exceptions et afficher des logs détaillés. Si la synchronisation échoue, l'application conserve le contact en local selon ce que l'utilisateur a effectué.
 
 == Interface utilisateur avec Jetpack Compose
 Notre application utilise Jetpack Compose, le toolkit moderne de Google pour la construction d'interfaces utilisateur natives Android. Cette approche déclarative simplifie considérablement le développement UI en comparaison avec les vues XML traditionnelles.
