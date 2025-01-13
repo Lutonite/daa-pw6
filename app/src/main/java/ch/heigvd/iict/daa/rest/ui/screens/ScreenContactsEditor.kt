@@ -165,6 +165,11 @@ fun ScreenContactsEditor(
         ButtonsRow(
             contact != null
         ) { action ->
+            if (action == ButtonAction.CANCEL) {
+                onQuit()
+                return@ButtonsRow
+            }
+
             val newContact = buildContact()
             if (newContact == null) {
                 Toast.makeText(
@@ -180,7 +185,7 @@ fun ScreenContactsEditor(
                 ButtonAction.CREATE -> contactsViewModel.create(newContact)
                 ButtonAction.UPDATE -> contactsViewModel.update(newContact)
                 ButtonAction.DELETE -> contactsViewModel.delete(newContact)
-                ButtonAction.CANCEL -> {}
+                else -> {}
             }
 
             onQuit()

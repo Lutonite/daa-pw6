@@ -11,10 +11,6 @@
 
 = Détails d'implémentation
 
-#import "template.typ": *
-
-= Détails d'implémentation
-
 == Gestion des états
 L'application utilise un système d'états pour gérer la synchronisation des contacts :
 - *SYNCED* : Contact synchronisé avec le serveur

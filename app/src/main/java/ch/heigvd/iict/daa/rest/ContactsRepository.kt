@@ -97,7 +97,7 @@ class ContactsRepository(
         }
     }
 
-    suspend fun deleteContact(contact: Contact, uuid: UUID?) = withContext(Dispatchers.IO) {
+    suspend fun deleteContact(contact: Contact, uuid: UUID?) = withContext(dispatcher) {
         // If it is not synced with a server entity we can delete it straight away
         if (contact.serverId == null) {
             contactsDao.delete(contact)
@@ -122,7 +122,7 @@ class ContactsRepository(
         }
     }
 
-    suspend fun refreshContacts(uuid: UUID?) = withContext(Dispatchers.IO) {
+    suspend fun refreshContacts(uuid: UUID?) = withContext(dispatcher) {
         if (uuid == null) {
             return@withContext
         }

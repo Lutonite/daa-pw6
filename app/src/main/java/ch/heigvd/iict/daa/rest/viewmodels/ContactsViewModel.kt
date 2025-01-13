@@ -16,14 +16,27 @@ import java.util.UUID
 private const val CONTACTS_PREFS_CONTEXT_KEY = "contacts_prefs"
 private const val CONTACTS_PREFS_KEY_TOKEN = "enrollment_token"
 
+/**
+ * Main [AndroidViewModel] for contacts in the application. Instantiated using the [Factory].
+ * It handles storing the contact edition state as well as connecting the repository to the UI.
+ *
+ * @author Emilie Bressoud
+ * @author Loïc Herman
+ * @author Sacha Butty
+ */
 class ContactsViewModel(application: ContactsApplication) : AndroidViewModel(application) {
 
+    // Fetch the repository lazily instantiated by the application
     private val repository = application.repository
+    // Get shared preferences to persist the UUID enrollment token
     private val sharedPreferences = application.getSharedPreferences(
         CONTACTS_PREFS_CONTEXT_KEY,
         Context.MODE_PRIVATE
     )
 
+    // Mapping between the UUID and the shared preferences, if the user is logged out then this
+    // value is null, requiring an enrollment. The repository will reject calls to the API if a
+    // token is not set for a call that requires one.
     private var userEnrollmentToken: UUID?
         get() = sharedPreferences
             .getString(CONTACTS_PREFS_KEY_TOKEN, null)
